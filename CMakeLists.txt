@@ -6,6 +6,14 @@ project(python-libnacs NONE)
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}"
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+if(WIN32 OR CYGWIN OR MINGW OR MSYS)
+  set(IS_WINDOWS True)
+  set(IS_UNIX False)
+else()
+  set(IS_WINDOWS False)
+  set(IS_UNIX True)
+endif()
+
 include(GNUInstallDirs)
 
 add_subdirectory(libnacs)
