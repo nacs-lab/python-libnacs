@@ -14,6 +14,8 @@ else()
   set(IS_UNIX True)
 endif()
 
+option(SEQ_IN_UTILS "Whether nacs-seq is included in nacs-utils" ${IS_WINDOWS})
+
 include(GNUInstallDirs)
 
 add_subdirectory(libnacs)
