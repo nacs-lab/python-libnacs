@@ -28,10 +28,28 @@ class CDLLEx(ctypes.CDLL):
             handle = kernel32.LoadLibraryExW(name, None, mode)
         super().__init__(name, mode, handle, use_errno, use_last_error)
 
-def _open_handle(name):
-    return CDLLEx(os.path.join(r"@INSTALL_WINDOWS_BINDIR@", name),
-                  LOAD_WITH_ALTERED_SEARCH_PATH)
+def _get_libpath(name):
+    return os.path.join(r"@INSTALL_WINDOWS_BINDIR@", name)
 
-nacs_seq = _open_handle(r"@CMAKE_SHARED_LIBRARY_PREFIX@@NACS_SEQ@-@MAJOR_VERSION@.dll")
-nacs_utils = _open_handle(r"@CMAKE_SHARED_LIBRARY_PREFIX@@NACS_UTILS@-@MAJOR_VERSION@.dll")
+def _open_handle(name):
+    return CDLLEx(_get_libpath(name), LOAD_WITH_ALTERED_SEARCH_PATH)
+
+seq_prefix = r"@CMAKE_SHARED_LIBRARY_PREFIX@@NACS_SEQ@"
+utils_prefix = r"@CMAKE_SHARED_LIBRARY_PREFIX@@NACS_UTILS@"
+
+def _load_libraries():
+    # Try looking for library without loading first.
+    # This maximum avoid any partially loaded library contaminating the address space.
+    for ver in range(min_ver, 100):
+        seq = seq_prefix + '-' + str(ver) + '.dll'
+        utils = utils_prefix + '-' + str(ver) + '.dll'
+        if os.path.exists(_get_libpath(seq)) and os.path.exists(_get_libpath(utils))
+            try:
+                return _open_handle(seq), _open_handle(utils)
+            except:
+                continue
+    # Finally trying to load unversioned library
+    return _open_handle(seq_prefix + '.dll'), _open_handle(utils_prefix + '.dll')
+
+nacs_seq, nacs_utils = _load_libraries()
 libc = ctypes.cdll.msvcrt

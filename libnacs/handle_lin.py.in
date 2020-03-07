@@ -1,7 +1,49 @@
 #
 
 import ctypes
+from ctypes.util import find_library
 
-nacs_seq = ctypes.CDLL(r"@CMAKE_SHARED_LIBRARY_PREFIX@@NACS_SEQ@.so.@MAJOR_VERSION@")
-nacs_utils = ctypes.CDLL(r"@CMAKE_SHARED_LIBRARY_PREFIX@@NACS_UTILS@.so.@MAJOR_VERSION@")
+min_ver = @MIN_LIB_VERSION@
+
+seq_prefix = r"@CMAKE_SHARED_LIBRARY_PREFIX@@NACS_SEQ@.so"
+utils_prefix = r"@CMAKE_SHARED_LIBRARY_PREFIX@@NACS_UTILS@.so"
+
+def _get_sover(path):
+    if path is None:
+        return -1
+    # Check SO version from file name...
+    # This isn't the most reliable way ever but should be good enough
+    # since we control the generation of the name.
+    p = path.split('.so.')
+    if len(p) < 2:
+        return -1
+    try:
+        return int(p[-1].split('.')[0])
+    except:
+        return -1
+
+def _load_libraries():
+    # Try looking for library without loading first.
+    # This maximum avoid any partially loaded library contaminating the address space.
+    seq = find_library("@NACS_SEQ@")
+    utils = find_library("@NACS_UTILS@")
+    seq_ver = _get_sover(seq)
+    utils_ver = _get_sover(utils)
+    if seq_ver >= min_ver and utils_ver >= min_ver and seq_ver == utils_ver:
+        try:
+            return ctypes.CDLL(seq), ctypes.CDLL(utils)
+        except:
+            pass
+    # Then try loading directly in case the `find_library` didn' find the right one.
+    for ver in range(min_ver, 100):
+        seq = seq_prefix + '.' + str(ver)
+        utils = utils_prefix + '.' + str(ver)
+        try:
+            return ctypes.CDLL(seq), ctypes.CDLL(utils)
+        except:
+            continue
+    # Finally trying to load unversioned library
+    return ctypes.CDLL(seq_prefix), ctypes.CDLL(utils_prefix)
+
+nacs_seq, nacs_utils = _load_libraries()
 libc = nacs_seq
