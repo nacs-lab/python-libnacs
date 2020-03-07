@@ -43,7 +43,7 @@ def _load_libraries():
     for ver in range(min_ver, 100):
         seq = seq_prefix + '-' + str(ver) + '.dll'
         utils = utils_prefix + '-' + str(ver) + '.dll'
-        if os.path.exists(_get_libpath(seq)) and os.path.exists(_get_libpath(utils))
+        if os.path.exists(_get_libpath(seq)) and os.path.exists(_get_libpath(utils)):
             try:
                 return _open_handle(seq), _open_handle(utils)
             except:
