@@ -34,6 +34,8 @@ def _get_libpath(name):
 def _open_handle(name):
     return CDLLEx(_get_libpath(name), LOAD_WITH_ALTERED_SEARCH_PATH)
 
+min_ver = @MIN_LIB_VERSION@
+
 seq_prefix = r"@CMAKE_SHARED_LIBRARY_PREFIX@@NACS_SEQ@"
 utils_prefix = r"@CMAKE_SHARED_LIBRARY_PREFIX@@NACS_UTILS@"
 
