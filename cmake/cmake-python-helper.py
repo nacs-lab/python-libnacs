@@ -28,7 +28,6 @@ from __future__ import print_function
 def get_sys_info():
     import sys
     import distutils.sysconfig
-    import imp
     print("exec_prefix:%s" % sys.exec_prefix)
     print("short_version:%s" % sys.version[:3])
     print("long_version:%s" % sys.version.split()[0])
@@ -36,9 +35,13 @@ def get_sys_info():
     print("site_packages_dir:%s" %
           distutils.sysconfig.get_python_lib(plat_specific=1))
     try:
-        magic_tag = imp.get_tag()
-    except AttributeError:
-        magic_tag = ''
+        magic_tag = sys.implementation.cache_tag
+    except:
+        try:
+            import imp
+            magic_tag = imp.get_tag()
+        except AttributeError:
+            magic_tag = ''
     print("magic_tag:%s" % magic_tag)
     return 0
 
