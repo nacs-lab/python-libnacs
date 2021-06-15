@@ -18,6 +18,7 @@ endif()
 
 python_install_module(libnacs "${CMAKE_CURRENT_BINARY_DIR}/handle.py"
   __init__.py
+  expseq_manager.py
   tweezer.py
   msquared.py
   wavemeter.py)
