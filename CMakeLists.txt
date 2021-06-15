@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 
-set(MAJOR_VERSION 10)
+set(MAJOR_VERSION 11)
 set(MINOR_VERSION 0)
 set(PATCH_VERSION 0)
 
@@ -30,7 +30,7 @@ option(SEQ_IN_UTILS "Whether nacs-seq is included in nacs-utils" ${IS_WINDOWS})
 # The loading code in `handle_*.py` is similarly written for convenience ruther than reliability.
 # It won't handle all the corner cases and could load  incompatible libraries.
 # The user is expected to upgrade the package in sync when necessary to avoid problems.
-set(MIN_LIB_VERSION 10)
+set(MIN_LIB_VERSION 11)
 
 include(GNUInstallDirs)
 include(PythonMacros)
