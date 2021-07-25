@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(python-libnacs NONE)
+project(python-libnacs C)
 
 set(MAJOR_VERSION 10)
 set(MINOR_VERSION 0)
