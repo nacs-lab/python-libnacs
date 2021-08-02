@@ -152,12 +152,20 @@ class ExpSeq:
         self.__mgr = mgr
 
     def __del__(self):
-        nacs_seq_manager_free_sequence(self.__mgr._ptr, self._ptr)
+        try:
+            nacs_seq_manager_free_sequence(self.__mgr._ptr, self._ptr)
+        except:
+            self.__mgr.check_message(True)
+            raise
         self.__mgr.check_message()
 
     def guarded(func):
         def f(self, *args, **kwargs):
-            res = func(self, *args, **kwargs)
+            try:
+                res = func(self, *args, **kwargs)
+            except:
+                self.__mgr.check_message(True)
+                raise
             self.__mgr.check_message()
             return res
         return f
@@ -294,7 +302,7 @@ class Manager:
     def debug(self, t, msg):
         self.__logger(MsgType.Debug, msg)
 
-    def check_message(self):
+    def check_message(self, extern_err=False):
         out_size = ctypes.c_size_t()
         ptr = nacs_seq_manager_take_messages(self._ptr, out_size)
         if not ptr or out_size.value == 0:
@@ -335,6 +343,12 @@ class Manager:
             else:
                 self.warn(f'Unknown message type: {msgtyp}')
 
+        # The caller wants to raise an exception, so we don't need to throw anything.
+        # This happens if the c function throws something that python can catch
+        # (happens on windows).
+        if extern_err:
+            error_idx = -1
+
         for (i, (msgtyp, t, msg)) in enumerate(msgs):
             if msgtyp == MsgType.Info:
                 self.info(t, msg)
@@ -361,7 +375,11 @@ class Manager:
 
     def guarded(func):
         def f(self, *args, **kwargs):
-            res = func(self, *args, **kwargs)
+            try:
+                res = func(self, *args, **kwargs)
+            except:
+                self.check_message(True)
+                raise
             self.check_message()
             return res
         return f
