@@ -28,8 +28,10 @@ class CDLLEx(ctypes.CDLL):
             handle = kernel32.LoadLibraryExW(name, None, mode)
         super().__init__(name, mode, handle, use_errno, use_last_error)
 
+install_bindir = r"@INSTALL_WINDOWS_BINDIR@"
+
 def _get_libpath(name):
-    return os.path.join(r"@INSTALL_WINDOWS_BINDIR@", name)
+    return os.path.join(install_bindir, name)
 
 def _open_handle(name):
     return CDLLEx(_get_libpath(name), LOAD_WITH_ALTERED_SEARCH_PATH)
@@ -53,5 +55,8 @@ def _load_libraries():
     # Finally trying to load unversioned library
     return _open_handle(seq_prefix + '.dll'), _open_handle(utils_prefix + '.dll')
 
+# Even though we could load LLVM without setting this path,
+# somehow calling some LLVM functions (`addPassesToEmitMC`) doesn't work without this.
+os.environ["PATH"] = os.environ["PATH"] + ";" + install_bindir
 nacs_seq, nacs_utils = _load_libraries()
 libc = ctypes.cdll.msvcrt
