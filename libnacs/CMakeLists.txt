@@ -1,7 +1,5 @@
 #
 
-include(PythonMacros)
-
 set(NACS_UTILS nacs-utils)
 if(SEQ_IN_UTILS)
   set(NACS_SEQ nacs-utils)
