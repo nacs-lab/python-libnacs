@@ -69,17 +69,32 @@ if(PYTHONINTERP_FOUND)
   if(python_config)
     string(REGEX REPLACE ".*exec_prefix:([^\n]+).*$" "\\1"
       PYTHON_PREFIX ${python_config})
-    cmake_utils_cygpath(PYTHON_PREFIX "${PYTHON_PREFIX}")
+    if(CYGWIN)
+      # We want to do this translation on the msys2 cmake (/usr/bin/cmake)
+      # since it would otherwise mess up the installation path.
+      # OTOH, we don't want to do this on the mingw cmake since
+      # passing it a unix path seems to cause it to install it under C: followed by the path
+      # specified. (i.e. `/c/abcd` turns into `C:/c/abcd` even though `/c/abcd`
+      # is supposed to be `C:/abcd`)
+      # I'm not really sure what are all the cmake versions out there on windows but at least
+      # CYGWIN is set on the msys2 cmake but not the mingw one so
+      # this is what we use to distinguish the two for now...
+      cmake_utils_cygpath(PYTHON_PREFIX "${PYTHON_PREFIX}")
+    endif()
     string(REGEX REPLACE ".*\nshort_version:([^\n]+).*$" "\\1"
       PYTHON_SHORT_VERSION ${python_config})
     string(REGEX REPLACE ".*\nlong_version:([^\n]+).*$" "\\1"
       PYTHON_LONG_VERSION ${python_config})
     string(REGEX REPLACE ".*\npy_inc_dir:([^\n]+).*$" "\\1"
       _TMP_PYTHON_INCLUDE_PATH ${python_config})
-    cmake_utils_cygpath(_TMP_PYTHON_INCLUDE_PATH "${_TMP_PYTHON_INCLUDE_PATH}")
+    if(CYGWIN)
+      cmake_utils_cygpath(_TMP_PYTHON_INCLUDE_PATH "${_TMP_PYTHON_INCLUDE_PATH}")
+    endif()
     string(REGEX REPLACE ".*\nsite_packages_dir:([^\n]+).*$" "\\1"
       _TMP_PYTHON_SITE_PACKAGES_DIR ${python_config})
-    cmake_utils_cygpath(_TMP_PYTHON_SITE_PACKAGES_DIR "${_TMP_PYTHON_SITE_PACKAGES_DIR}")
+    if(CYGWIN)
+      cmake_utils_cygpath(_TMP_PYTHON_SITE_PACKAGES_DIR "${_TMP_PYTHON_SITE_PACKAGES_DIR}")
+    endif()
     string(REGEX REPLACE ".*\nmagic_tag:([^\n]*).*$" "\\1"
       PYTHON_MAGIC_TAG ${python_config})
 
