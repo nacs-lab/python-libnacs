@@ -55,6 +55,10 @@ nacs_seq_manager_load_config_string = handle.nacs_seq.nacs_seq_manager_load_conf
 nacs_seq_manager_load_config_string.restype = None
 nacs_seq_manager_load_config_string.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
 
+nacs_seq_manager_new_run = handle.nacs_seq.nacs_seq_manager_new_run
+nacs_seq_manager_new_run.restype = None
+nacs_seq_manager_new_run.argtypes = [ctypes.c_void_p]
+
 nacs_seq_manager_expseq_init_run = handle.nacs_seq.nacs_seq_manager_expseq_init_run
 nacs_seq_manager_expseq_init_run.restype = None
 nacs_seq_manager_expseq_init_run.argtypes = [ctypes.c_void_p]
@@ -405,6 +409,9 @@ class Manager:
     @guarded
     def load_config_string(self, config):
         nacs_seq_manager_load_config_string(self._ptr, config.encode())
+
+    def new_run(self):
+        nacs_seq_manager_new_run(self._ptr)
 
     def enable_debug(self, enable):
         nacs_seq_manager_enable_debug(self._ptr, enable)
