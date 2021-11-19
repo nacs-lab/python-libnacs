@@ -47,6 +47,10 @@ nacs_seq_manager_free_sequence = handle.nacs_seq.nacs_seq_manager_free_sequence
 nacs_seq_manager_free_sequence.restype = None
 nacs_seq_manager_free_sequence.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
 
+nacs_seq_manager_get_device_restart = handle.nacs_seq.nacs_seq_manager_get_device_restart
+nacs_seq_manager_get_device_restart.restype = ctypes.c_uint32
+nacs_seq_manager_get_device_restart.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+
 nacs_seq_manager_load_config_file = handle.nacs_seq.nacs_seq_manager_load_config_file
 nacs_seq_manager_load_config_file.restype = None
 nacs_seq_manager_load_config_file.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
@@ -107,6 +111,10 @@ nacs_seq_manager_expseq_get_seq_dump.argtypes = [ctypes.c_void_p, ctypes.POINTER
 nacs_seq_manager_expseq_get_seq_opt_dump = handle.nacs_seq.nacs_seq_manager_expseq_get_seq_opt_dump
 nacs_seq_manager_expseq_get_seq_opt_dump.restype = ctypes.POINTER(ctypes.c_uint8)
 nacs_seq_manager_expseq_get_seq_opt_dump.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_size_t)]
+
+nacs_seq_manager_expseq_refresh_device_restart = handle.nacs_seq.nacs_seq_manager_expseq_refresh_device_restart
+nacs_seq_manager_expseq_refresh_device_restart.restype = ctypes.c_uint32
+nacs_seq_manager_expseq_refresh_device_restart.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
 
 nacs_seq_manager_expseq_get_nidaq_data = handle.nacs_seq.nacs_seq_manager_expseq_get_nidaq_data
 nacs_seq_manager_expseq_get_nidaq_data.restype = ctypes.POINTER(ctypes.c_double)
@@ -230,6 +238,10 @@ class ExpSeq:
         if not ptr or out_size.value == 0:
             return
         return ctypes.string_at(ptr, out_size.value).decode()
+
+    @guarded
+    def refresh_device_restart(self, name):
+        return nacs_seq_manager_expseq_refresh_device_restart(self._ptr, name.encode())
 
     @guarded
     def get_nidaq_data(self, name):
@@ -401,6 +413,9 @@ class Manager:
         # Construct the object before checking for error to make sure that
         # the pointer is freed even if there's an unexpected error.
         return ExpSeq(self, ptr)
+
+    def get_device_restart(self, name):
+        return nacs_seq_manager_get_device_restart(self._ptr, name.encode())
 
     @guarded
     def load_config_file(self, fname):
