@@ -19,6 +19,10 @@ nacs_seq_manager_tick_per_sec = handle.nacs_seq.nacs_seq_manager_tick_per_sec
 nacs_seq_manager_tick_per_sec.restype = ctypes.c_int64
 nacs_seq_manager_tick_per_sec.argtypes = [ctypes.c_void_p]
 
+nacs_seq_manager_max_seq_len = handle.nacs_seq.nacs_seq_manager_max_seq_len
+nacs_seq_manager_max_seq_len.restype = ctypes.c_uint64
+nacs_seq_manager_max_seq_len.argtypes = [ctypes.c_void_p]
+
 nacs_seq_manager_take_messages = handle.nacs_seq.nacs_seq_manager_take_messages
 nacs_seq_manager_take_messages.restype = ctypes.POINTER(ctypes.c_uint8)
 nacs_seq_manager_take_messages.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_size_t)]
@@ -58,6 +62,10 @@ nacs_seq_manager_load_config_file.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
 nacs_seq_manager_load_config_string = handle.nacs_seq.nacs_seq_manager_load_config_string
 nacs_seq_manager_load_config_string.restype = None
 nacs_seq_manager_load_config_string.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+
+nacs_seq_manager_get_config_string = handle.nacs_seq.nacs_seq_manager_get_config_string
+nacs_seq_manager_get_config_string.restype = None
+nacs_seq_manager_get_config_string.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.POINTER(ctypes.c_size_t)]
 
 nacs_seq_manager_new_run = handle.nacs_seq.nacs_seq_manager_new_run
 nacs_seq_manager_new_run.restype = None
@@ -134,6 +142,13 @@ nacs_seq_manager_expseq_get_zynq_bytecode = handle.nacs_seq.nacs_seq_manager_exp
 nacs_seq_manager_expseq_get_zynq_bytecode.restype = ctypes.POINTER(ctypes.c_uint8)
 nacs_seq_manager_expseq_get_zynq_bytecode.argtypes = [ctypes.c_void_p, ctypes.c_char_p,
                                                       ctypes.POINTER(ctypes.c_size_t)]
+
+nacs_seq_manager_expseq_get_zynq_val = handle.nacs_seq.nacs_seq_manager_expseq_get_zynq_val
+nacs_seq_manager_expseq_get_zynq_val.restype = None
+nacs_seq_manager_expseq_get_zynq_val.argtypes = [ctypes.c_void_p, ctypes.c_char_p,
+                                                 ctypes.c_uint32,
+                                                 ctypes.POINTER(ctypes.POINTER(ctypes.c_uint8)), ctypes.POINTER(ctypes.c_size_t),
+                                                 ctypes.POINTER(ctypes.POINTER(ctypes.c_uint8)), ctypes.POINTER(ctypes.c_size_t)]
 
 class ZynqClock(ctypes.Structure):
     _fields_ = [('time', ctypes.c_int64),
@@ -271,6 +286,18 @@ class ExpSeq:
         return array.array('B', ptr[0])
 
     @guarded
+    def get_zynq_val(self, name, chn_id):
+        ts_size = ctypes.c_size_t()
+        ts_ptr = ctypes.POINTER(ctypes.c_uint8)()
+        vals_size = ctypes.c_size_t()
+        vals_ptr = ctypes.POINTER(ctypes.c_uint8)()
+        nacs_seq_manager_expseq_get_zynq_val(self._ptr, name.encode(), chn_id,
+                                                 ctypes.byref(ts_ptr), ts_size, ctypes.byref(vals_ptr), vals_size)
+        ts_ptr = ctypes.cast(ts_ptr, ctypes.POINTER(ctypes.c_uint64 * int(ts_size.value / 8)))
+        vals_ptr = ctypes.cast(vals_ptr, ctypes.POINTER(ctypes.c_double * int(vals_size.value / 8)))
+        return array.array('Q', ts_ptr[0]), array.array('d', vals_ptr[0])
+
+    @guarded
     def get_zynq_clock(self, name):
         out_size = ctypes.c_uint32()
         ptr = nacs_seq_manager_expseq_get_zynq_clock(self._ptr, name.encode(), out_size)
@@ -406,6 +433,10 @@ class Manager:
         return nacs_seq_manager_tick_per_sec(self._ptr)
 
     @guarded
+    def max_seq_len(self):
+        return nacs_seq_manager_max_seq_len(self._ptr)
+
+    @guarded
     def create_sequence(self, data):
         ptr = nacs_seq_manager_create_sequence(self._ptr,
                                                ctypes.c_uint8.from_buffer(data), len(data))
@@ -425,6 +456,13 @@ class Manager:
     @guarded
     def load_config_string(self, config):
         nacs_seq_manager_load_config_string(self._ptr, config.encode())
+
+    @guarded
+    def get_config_string(self, name):
+        ptr = ctypes.c_char_p()
+        out_size = ctypes.c_size_t()
+        nacs_seq_manager_get_config_string(self._ptr, name.encode(), ptr, out_size)
+        return ctypes.string_at(ptr, out_size.value).decode()
 
     def new_run(self):
         nacs_seq_manager_new_run(self._ptr)
