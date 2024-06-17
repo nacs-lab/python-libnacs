@@ -40,29 +40,35 @@ endif()
 
 include(CMakeVarMacros)
 
-function(__cmake_utils_call_helper func_name var_name)
-  cmake_utils_get_unique_name(
-    "___cmake_utils_call_helper_${func_name}" unique_name)
-  set("${unique_name}" 0 PARENT_SCOPE)
-  variable_watch("${unique_name}" "${func_name}")
-  set("${var_name}" "${unique_name}" PARENT_SCOPE)
-endfunction()
+if(CMAKE_VERSION VERSION_LESS "3.18.0")
+  function(__cmake_utils_call_helper func_name var_name)
+    cmake_utils_get_unique_name(
+      "___cmake_utils_call_helper_${func_name}" unique_name)
+    set("${unique_name}" 0 PARENT_SCOPE)
+    variable_watch("${unique_name}" "${func_name}")
+    set("${var_name}" "${unique_name}" PARENT_SCOPE)
+  endfunction()
 
-# cmake_utils_call(function_name)
-#     @function_name: the name of function or macro to be called.
-#
-#     This macro will call the function or macro by name. The scope of the
-#     function call is the same with the scope to call this macro therefore
-#     setting variables in a macro or setting PARENT_SCOPE variables in a
-#     function WILL work. This version of the function does not support
-#     passing arbitrary arguments, use #cmake_utils_wrap_call,
-#     #cmake_utils_call_args or #cmake_utils_call_args_with_var if you
-#     need to do that.
-macro(cmake_utils_call ___func_name)
-  __cmake_utils_call_helper("${___func_name}"
-    __cmake_utils_call_watch_var_name_${___func_name})
-  set("${__cmake_utils_call_watch_var_name_${___func_name}}")
-endmacro()
+  # cmake_utils_call(function_name)
+  #     @function_name: the name of function or macro to be called.
+  #
+  #     This macro will call the function or macro by name. The scope of the
+  #     function call is the same with the scope to call this macro therefore
+  #     setting variables in a macro or setting PARENT_SCOPE variables in a
+  #     function WILL work. This version of the function does not support
+  #     passing arbitrary arguments, use #cmake_utils_wrap_call,
+  #     #cmake_utils_call_args or #cmake_utils_call_args_with_var if you
+  #     need to do that.
+  macro(cmake_utils_call ___func_name)
+    __cmake_utils_call_helper("${___func_name}"
+      __cmake_utils_call_watch_var_name_${___func_name})
+    set("${__cmake_utils_call_watch_var_name_${___func_name}}")
+  endmacro()
+else()
+  macro(cmake_utils_call ___func_name)
+    cmake_language(CALL "${___func_name}")
+  endmacro()
+endif()
 
 # cmake_utils_call_with_var(var_names function_name)
 #     @var_names: the variable names to be propagate to parent scope.
