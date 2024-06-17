@@ -44,12 +44,70 @@
 include(CMakeVarMacros)
 include(CMakePathMacros)
 
-# Hopefully this will not break anything
-find_package(Python REQUIRED)
-
-get_filename_component(PYTHON_MACROS_MODULE_PATH
+get_filename_component(_py_cmake_module_dir
   "${CMAKE_CURRENT_LIST_FILE}" PATH)
 set(_cmake_python_helper "${_py_cmake_module_dir}/cmake-python-helper.py")
+if(NOT EXISTS "${_cmake_python_helper}")
+  message(FATAL_ERROR "The file cmake-python-helper.py does not exist in ${_py_cmake_module_dir} (the directory where PythonMacros.cmake is located). Check your installation.")
+endif()
+
+if(CMAKE_VERSION VERSION_LESS "3.12.0")
+  find_package(PythonInterp REQUIRED)
+else()
+  find_package(Python REQUIRED)
+  set(PYTHON_EXECUTABLE "${Python_EXECUTABLE}"
+    CACHE PATH "Path to the Python interpreter.")
+endif()
+
+execute_process(COMMAND ${PYTHON_EXECUTABLE}
+  "${_cmake_python_helper}" --get-sys-info OUTPUT_VARIABLE python_config)
+if(python_config)
+  string(REGEX REPLACE ".*exec_prefix:([^\n]+).*$" "\\1"
+    PYTHON_PREFIX ${python_config})
+  if(CYGWIN)
+    # We want to do this translation on the msys2 cmake (/usr/bin/cmake)
+    # since it would otherwise mess up the installation path.
+    # OTOH, we don't want to do this on the mingw cmake since
+    # passing it a unix path seems to cause it to install it under C: followed by the path
+    # specified. (i.e. `/c/abcd` turns into `C:/c/abcd` even though `/c/abcd`
+    # is supposed to be `C:/abcd`)
+    # I'm not really sure what are all the cmake versions out there on windows but at least
+    # CYGWIN is set on the msys2 cmake but not the mingw one so
+    # this is what we use to distinguish the two for now...
+    cmake_utils_cygpath(PYTHON_PREFIX "${PYTHON_PREFIX}")
+  endif()
+  string(REGEX REPLACE ".*\nshort_version:([^\n]+).*$" "\\1"
+    PYTHON_SHORT_VERSION ${python_config})
+  string(REGEX REPLACE ".*\nlong_version:([^\n]+).*$" "\\1"
+    PYTHON_LONG_VERSION ${python_config})
+  string(REGEX REPLACE ".*\npy_inc_dir:([^\n]+).*$" "\\1"
+    _TMP_PYTHON_INCLUDE_PATH ${python_config})
+  if(CYGWIN)
+    cmake_utils_cygpath(_TMP_PYTHON_INCLUDE_PATH "${_TMP_PYTHON_INCLUDE_PATH}")
+  endif()
+  string(REGEX REPLACE ".*\nsite_packages_dir:([^\n]+).*$" "\\1"
+    _TMP_PYTHON_SITE_PACKAGES_DIR ${python_config})
+  if(CYGWIN)
+    cmake_utils_cygpath(_TMP_PYTHON_SITE_PACKAGES_DIR "${_TMP_PYTHON_SITE_PACKAGES_DIR}")
+  endif()
+  string(REGEX REPLACE ".*\nmagic_tag:([^\n]*).*$" "\\1"
+    PYTHON_MAGIC_TAG ${python_config})
+
+  # Put these two variables in the cache so they are visible for the user, but read-only:
+  set(PYTHON_INCLUDE_PATH "${_TMP_PYTHON_INCLUDE_PATH}"
+    CACHE PATH "The python include directory" FORCE)
+  set(PYTHON_SITE_PACKAGES_DIR "${_TMP_PYTHON_SITE_PACKAGES_DIR}"
+    CACHE PATH "The python site packages dir" FORCE)
+
+  # This one is intended to be used and changed by the user for
+  # installing own modules:
+  if(NOT PYTHON_SITE_PACKAGES_INSTALL_DIR)
+    set(PYTHON_SITE_PACKAGES_INSTALL_DIR ${_TMP_PYTHON_SITE_PACKAGES_DIR})
+  endif()
+
+  string(REGEX REPLACE "([0-9]+).([0-9]+)" "\\1\\2"
+    PYTHON_SHORT_VERSION_NO_DOT ${PYTHON_SHORT_VERSION})
+endif()
 
 function(_python_compile SOURCE_FILE OUT_PY OUT_PYC)
   # Filename
