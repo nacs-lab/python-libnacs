@@ -51,15 +51,9 @@ if(NOT EXISTS "${_cmake_python_helper}")
   message(FATAL_ERROR "The file cmake-python-helper.py does not exist in ${_py_cmake_module_dir} (the directory where PythonMacros.cmake is located). Check your installation.")
 endif()
 
-if(CMAKE_VERSION VERSION_LESS "3.12.0")
-  find_package(PythonInterp REQUIRED)
-else()
-  find_package(Python REQUIRED)
-  set(PYTHON_EXECUTABLE "${Python_EXECUTABLE}"
-    CACHE PATH "Path to the Python interpreter.")
-endif()
+find_package(Python REQUIRED)
 
-execute_process(COMMAND ${PYTHON_EXECUTABLE}
+execute_process(COMMAND ${Python_EXECUTABLE}
   "${_cmake_python_helper}" --get-sys-info OUTPUT_VARIABLE python_config)
 if(python_config)
   string(REGEX REPLACE ".*exec_prefix:([^\n]+).*$" "\\1"
@@ -76,118 +70,135 @@ if(python_config)
     # this is what we use to distinguish the two for now...
     cmake_utils_cygpath(PYTHON_PREFIX "${PYTHON_PREFIX}")
   endif()
-  string(REGEX REPLACE ".*\nshort_version:([^\n]+).*$" "\\1"
-    PYTHON_SHORT_VERSION ${python_config})
-  string(REGEX REPLACE ".*\nlong_version:([^\n]+).*$" "\\1"
-    PYTHON_LONG_VERSION ${python_config})
-  string(REGEX REPLACE ".*\npy_inc_dir:([^\n]+).*$" "\\1"
-    _TMP_PYTHON_INCLUDE_PATH ${python_config})
-  if(CYGWIN)
-    cmake_utils_cygpath(_TMP_PYTHON_INCLUDE_PATH "${_TMP_PYTHON_INCLUDE_PATH}")
-  endif()
-  string(REGEX REPLACE ".*\nsite_packages_dir:([^\n]+).*$" "\\1"
-    _TMP_PYTHON_SITE_PACKAGES_DIR ${python_config})
-  if(CYGWIN)
-    cmake_utils_cygpath(_TMP_PYTHON_SITE_PACKAGES_DIR "${_TMP_PYTHON_SITE_PACKAGES_DIR}")
-  endif()
   string(REGEX REPLACE ".*\nmagic_tag:([^\n]*).*$" "\\1"
     PYTHON_MAGIC_TAG ${python_config})
-
-  # Put these two variables in the cache so they are visible for the user, but read-only:
-  set(PYTHON_INCLUDE_PATH "${_TMP_PYTHON_INCLUDE_PATH}"
-    CACHE PATH "The python include directory" FORCE)
-  set(PYTHON_SITE_PACKAGES_DIR "${_TMP_PYTHON_SITE_PACKAGES_DIR}"
-    CACHE PATH "The python site packages dir" FORCE)
-
-  # This one is intended to be used and changed by the user for
-  # installing own modules:
-  if(NOT PYTHON_SITE_PACKAGES_INSTALL_DIR)
-    set(PYTHON_SITE_PACKAGES_INSTALL_DIR ${_TMP_PYTHON_SITE_PACKAGES_DIR})
-  endif()
-
-  string(REGEX REPLACE "([0-9]+).([0-9]+)" "\\1\\2"
-    PYTHON_SHORT_VERSION_NO_DOT ${PYTHON_SHORT_VERSION})
+  string(REGEX REPLACE ".*\nextension_suffix:([^\n]*).*$" "\\1"
+    PYTHON_EXTENSION_SUFFIX ${python_config})
 endif()
 
-function(_python_compile SOURCE_FILE OUT_PY OUT_PYC)
+if(DEFINED PYTHON_SITE_INSTALL_DIR)
+  # If the user supplied the PYTHON_SITE_INSTALL_DIR option we want to
+  # keep using it across reconfigurations so PYTHON_SITE_INSTALL_DIR should be cached.
+  # However, if the user didn't supply one and we are using the default
+  # I'd like it to be updating if the python version changed automatically
+  # on a reconfigure so the variable we use for installation shouldn't be cached.
+  # Hence we assign the user option or the find_package(Python) value
+  # to a non-cached variable.
+  set(_PYTHON_SITE_INSTALL_DIR "${PYTHON_SITE_INSTALL_DIR}")
+else()
+  set(_PYTHON_SITE_INSTALL_DIR "${Python_SITEARCH}")
+endif()
+
+add_custom_target(all-python-target)
+
+function(_python_compile SOURCE_FILE OUT_PY OUT_PYC OUT_TGT)
   # Filename
   get_filename_component(src_base "${SOURCE_FILE}" NAME_WE)
 
   cmake_utils_abs_path(src "${SOURCE_FILE}")
+  get_filename_component(src_path "${src}" PATH)
   cmake_utils_is_subpath(issub "${CMAKE_BINARY_DIR}" "${src}")
   if(issub)
     # Already in the bin dir
     # Don't copy the file onto itself.
     set(dst "${src}")
+    set(dst_path "${src_path}")
+    cmake_utils_src_to_bin(basedir "${_BASE_DIR}")
   else()
     cmake_utils_src_to_bin(dst "${src}")
     cmake_utils_is_subpath(issub "${CMAKE_BINARY_DIR}" "${dst}")
     if(NOT issub)
-      # In case we mess up the path, do something not damaging at least...
-      # We could also just throw an error
-      set(dst "${CMAKE_CURRENT_BINARY_DIR}")
+      message(FATAL_ERROR "Cannot determine binary directory for ${src}")
     endif()
+    get_filename_component(dst_path "${dst}" PATH)
+    file(MAKE_DIRECTORY "${dst_path}")
     add_custom_command(
       OUTPUT "${dst}"
       COMMAND ${CMAKE_COMMAND} -E copy "${src}" "${dst}"
       DEPENDS "${src}")
+    set(basedir "${_BASE_DIR}")
   endif()
+  file(RELATIVE_PATH rel_path "${basedir}" "${src_path}/${src_base}")
+  string(REGEX REPLACE "[^-._a-z0-9A-Z]" "_" target_name "${rel_path}")
+  cmake_utils_get_unique_target(python-${target_name} _py_compile_target)
 
-  get_filename_component(src_path "${src}" PATH)
-  get_filename_component(dst_path "${dst}" PATH)
-  file(MAKE_DIRECTORY "${dst_path}")
-
-  if(PYTHON_MAGIC_TAG)
-    # PEP 3147
-    set(dst_pyc "${dst_path}/__pycache__/${src_base}.${PYTHON_MAGIC_TAG}.pyc")
-    # should be fine, just in case
-    file(MAKE_DIRECTORY "${dst_path}/__pycache__")
-  else()
-    # python2
-    set(dst_pyc "${dst_path}/${src_base}.pyc")
-  endif()
+  # PEP 3147
+  set(dst_pyc "${dst_path}/__pycache__/${src_base}.${PYTHON_MAGIC_TAG}.pyc")
+  # should be fine, just in case
+  file(MAKE_DIRECTORY "${dst_path}/__pycache__")
   add_custom_command(
     OUTPUT "${dst_pyc}"
-    COMMAND ${PYTHON_EXECUTABLE} "${_cmake_python_helper}" --compile "${dst}"
+    COMMAND ${Python_EXECUTABLE} "${_cmake_python_helper}" --compile "${dst}"
     DEPENDS "${dst}")
+
+  add_custom_target("${_py_compile_target}" ALL DEPENDS "${dst}" "${dst_pyc}")
+  add_dependencies(all-python-target "${_py_compile_target}")
   set(${OUT_PY} "${dst}" PARENT_SCOPE)
   set(${OUT_PYC} "${dst_pyc}" PARENT_SCOPE)
+  set(${OUT_TGT} "${_py_compile_target}" PARENT_SCOPE)
 endfunction()
 
 macro(__python_compile)
-  _python_compile("${_pyfile}" out_py out_pyc)
+  get_filename_component(_ext "${_pyfile}" EXT)
+  if("${_ext}" STREQUAL ".py")
+    _python_compile("${_pyfile}" out_py out_pyc out_tgt)
+  else()
+    message(FATAL_ERROR "Unknown file type ${_pyfile}")
+  endif()
 endmacro()
 
-function(python_compile)
+function(python_compile _BASE_DIR)
   cmake_array_foreach(_pyfile __python_compile)
 endfunction()
 
 macro(__python_install)
-  _python_compile("${_pyfile}" out_py out_pyc)
-  cmake_utils_get_unique_name(python_compile_target _py_compile_target)
-  add_custom_target("${_py_compile_target}" ALL
-    DEPENDS "${out_py}" "${out_pyc}")
-  install(FILES "${out_py}" DESTINATION "${DEST_DIR}")
-  if(PYTHON_MAGIC_TAG)
-    # PEP 3147
+  get_filename_component(_ext "${_pyfile}" EXT)
+  if("${_ext}" STREQUAL ".py")
+    _python_compile("${_pyfile}" out_py out_pyc out_tgt)
+    install(FILES "${out_py}" DESTINATION "${DEST_DIR}")
     set(PYC_DEST_DIR "${DEST_DIR}/__pycache__")
+    install(FILES "${out_pyc}" DESTINATION "${PYC_DEST_DIR}")
   else()
-    # python2
-    set(PYC_DEST_DIR "${DEST_DIR}")
+    message(FATAL_ERROR "Unknown file type ${_pyfile}")
   endif()
-  install(FILES "${out_pyc}" DESTINATION "${PYC_DEST_DIR}")
 endmacro()
 
-function(python_install DEST_DIR)
+function(python_install _BASE_DIR DEST_DIR)
   cmake_array_foreach(_pyfile __python_install 1)
 endfunction()
 
-function(python_install_as_module)
-  set(DEST_DIR "${PYTHON_SITE_PACKAGES_INSTALL_DIR}")
-  cmake_array_foreach(_pyfile __python_install)
+function(python_install_as_module _BASE_DIR)
+  set(DEST_DIR "${_PYTHON_SITE_INSTALL_DIR}")
+  cmake_array_foreach(_pyfile __python_install 1)
 endfunction()
 
-function(python_install_module MODULE_NAME)
-  set(DEST_DIR "${PYTHON_SITE_PACKAGES_INSTALL_DIR}/${MODULE_NAME}")
-  cmake_array_foreach(_pyfile __python_install 1)
+function(python_install_module _BASE_DIR MODULE_NAME)
+  set(DEST_DIR "${_PYTHON_SITE_INSTALL_DIR}/${MODULE_NAME}")
+  cmake_array_foreach(_pyfile __python_install 2)
+endfunction()
+
+macro(__python_test)
+  get_filename_component(_ext "${_pyfile}" EXT)
+  if("${_ext}" STREQUAL ".py")
+    _python_compile("${_pyfile}" out_py out_pyc out_tgt)
+    get_filename_component(src_base "${_pyfile}" NAME_WE)
+    if("${src_base}" MATCHES "^test_")
+      add_test(NAME test/python/${src_base}
+        COMMAND env "PYTHONPATH=${PYTHONPATH}"
+        ${Python_EXECUTABLE} -m pytest "${out_py}"
+        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
+    endif()
+  else()
+    message(FATAL_ERROR "Unknown file type ${_pyfile}")
+  endif()
+endmacro()
+
+function(python_test PYTHONPATH)
+  # Setting this makes sure that the library pxd's are in a sub directory
+  # and therefore have their filename stored as a relative path rather than
+  # just a filename (as is the case for system headers).
+  # This makes sure that the file path is correct in the coverage report.
+  set(_BASE_DIR "${CMAKE_BINARY_DIR}")
+  set(PYTHONPATH "${PYTHONPATH}:${CMAKE_CURRENT_BINARY_DIR}")
+  cmake_array_foreach(_pyfile __python_test 1)
 endfunction()

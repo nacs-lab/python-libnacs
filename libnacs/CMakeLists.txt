@@ -14,8 +14,9 @@ else()
   configure_file(handle_lin.py.in handle.py @ONLY)
 endif()
 
-python_install_module(libnacs "${CMAKE_CURRENT_BINARY_DIR}/handle.py"
+python_install_module("${CMAKE_CURRENT_SOURCE_DIR}/.." libnacs
   __init__.py
+  "${CMAKE_CURRENT_BINARY_DIR}/handle.py"
   expseq_manager.py
   tweezer.py
   msquared.py
