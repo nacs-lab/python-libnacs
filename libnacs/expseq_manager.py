@@ -148,8 +148,9 @@ free = handle.libc['free']
 free.restype = None
 free.argtypes = [ctypes.c_void_p]
 
-class Error:
+class Error(Exception):
     def __init__(self, msg, _type, code, type1, id1, type2, id2):
+        super().__init__(msg)
         self.msg = msg
         self.type = _type
         self.code = code
