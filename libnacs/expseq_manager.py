@@ -159,6 +159,18 @@ nacs_seq_manager_expseq_get_zynq_clock.restype = ctypes.POINTER(ZynqClock)
 nacs_seq_manager_expseq_get_zynq_clock.argtypes = [ctypes.c_void_p, ctypes.c_char_p,
                                                    ctypes.POINTER(ctypes.c_uint32)]
 
+class ChnOutput(ctypes.Structure):
+    _fields_ = [('name', ctypes.POINTER(ctypes.c_char)),
+                ('name_sz', ctypes.c_size_t),
+                ('times', ctypes.POINTER(ctypes.c_int64)),
+                ('values', ctypes.POINTER(ctypes.c_double)),
+                ('pulse_ids', ctypes.POINTER(ctypes.c_uint32)),
+                ('npts', ctypes.c_size_t)]
+
+nacs_seq_manager_expseq_get_nominal_output = handle.nacs_seq.nacs_seq_manager_expseq_get_nominal_output
+nacs_seq_manager_expseq_get_nominal_output.restype = ctypes.POINTER(ChnOutput)
+nacs_seq_manager_expseq_get_nominal_output.argtypes = [ctypes.c_void_p, ctypes.c_uint64, ctypes.POINTER(ctypes.c_size_t)]
+
 free = handle.libc['free']
 free.restype = None
 free.argtypes = [ctypes.c_void_p]
@@ -304,6 +316,31 @@ class ExpSeq:
         if not ptr:
             return
         return [(v.time, v.period) for v in ptr[:out_size.value]]
+
+    @guarded
+    def get_nominal_output(self, pts_per_ramp):
+        out_size = ctypes.c_size_t()
+        ptr = nacs_seq_manager_expseq_get_nominal_output(self._ptr, ctypes.c_uint64(pts_per_ramp), ctypes.byref(out_size))
+        if not ptr or out_size.value == 0:
+            return [["", [], [], []]]
+        res = []
+        for i in range(out_size.value):
+            v = ptr[i]
+            name = v.name[:(v.name_sz - 1)].decode()
+            times_ptr = ctypes.cast(v.times, ctypes.POINTER(ctypes.c_int64 * v.npts))
+            values_ptr = ctypes.cast(v.values, ctypes.POINTER(ctypes.c_double * v.npts))
+            pulse_ids_ptr = ctypes.cast(v.pulse_ids, ctypes.POINTER(ctypes.c_uint32 * v.npts))
+            times = array.array('q', times_ptr[0])
+            values = array.array('d', values_ptr[0])
+            pulse_ids = array.array('L', pulse_ids_ptr[0])
+            res.append([name, times, values, pulse_ids])
+            #res.append([name, v.times[:v.npts], v.values[:v.npts], v.pulse_ids[:v.npts]])
+            free(v.name)
+            free(v.times)
+            free(v.values)
+            free(v.pulse_ids)
+        free(ptr)
+        return res
 
     del guarded
 
