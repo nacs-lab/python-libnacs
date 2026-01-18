@@ -305,9 +305,13 @@ class ExpSeq:
         vals_ptr = ctypes.POINTER(ctypes.c_uint8)()
         nacs_seq_manager_expseq_get_zynq_val(self._ptr, name.encode(), chn_id,
                                                  ctypes.byref(ts_ptr), ts_size, ctypes.byref(vals_ptr), vals_size)
-        ts_ptr = ctypes.cast(ts_ptr, ctypes.POINTER(ctypes.c_uint64 * int(ts_size.value / 8)))
-        vals_ptr = ctypes.cast(vals_ptr, ctypes.POINTER(ctypes.c_double * int(vals_size.value / 8)))
-        return array.array('Q', ts_ptr[0]), array.array('d', vals_ptr[0])
+        try:
+            ts = ctypes.cast(ts_ptr, ctypes.POINTER(ctypes.c_uint64 * int(ts_size.value / 8)))[0]
+            vals = ctypes.cast(vals_ptr, ctypes.POINTER(ctypes.c_double * int(vals_size.value / 8)))[0]
+        finally:
+            free(ts_ptr)
+            free(vals_ptr)
+        return array.array('Q', ts), array.array('d', vals)
 
     @guarded
     def get_zynq_clock(self, name):
